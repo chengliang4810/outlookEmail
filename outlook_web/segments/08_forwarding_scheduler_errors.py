@@ -1535,6 +1535,9 @@ def parse_external_int_arg(name: str, default: int) -> tuple[Optional[int], Opti
         return None, f'{name} 参数必须是数字'
 
 
+DEFAULT_VERIFICATION_CODE_REGEX = r'(?<!\d)\d{4,6}(?!\d)'
+
+
 @app.route('/api/external/verification-code', methods=['GET'])
 @csrf_exempt
 @api_key_required
@@ -1551,15 +1554,16 @@ def api_external_verification_code():
         return jsonify({'success': False, 'error': '缺少 email 参数'}), 400
     if not since_value:
         return jsonify({'success': False, 'error': '缺少 since 参数'}), 400
-    if not regex_value:
-        return jsonify({'success': False, 'error': '缺少 regex 参数'}), 400
 
     since_dt = parse_external_since_datetime(since_value)
     if not since_dt:
         return jsonify({'success': False, 'error': 'since 参数无效，请使用 yyyy-MM-dd HH:mm:ss 格式'}), 400
 
     try:
-        pattern = re.compile(regex_value, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        pattern = re.compile(
+            regex_value or DEFAULT_VERIFICATION_CODE_REGEX,
+            re.IGNORECASE | re.MULTILINE | re.DOTALL
+        )
     except re.error as exc:
         return jsonify({'success': False, 'error': f'regex 参数无效: {str(exc)}'}), 400
 

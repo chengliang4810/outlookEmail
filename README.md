@@ -404,7 +404,7 @@ user@example.com----app-password----imap.example.com----993
 - 支持特殊字符别名，例如 `user+alias@example.com`
 - 查询 `@gmail.com` / `@googlemail.com` 地址时，原后缀未命中会自动回退到另一个后缀
 - 默认 `top=1`
-- 支持从指定时间之后的邮件原文中按自定义正则提取验证码
+- 支持从指定时间之后的邮件原文中提取验证码，未传 `regex` 时默认去掉 HTML 后提取 4-6 位连续数字
 
 **配置步骤：**
 1. 点击「⚙️ 设置」→ 在「对外 API Key」处点击「🔑 随机生成」→ 保存
@@ -422,6 +422,9 @@ curl -H "X-API-Key: your-api-key" \
 
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:5000/api/external/emails?email=user%2Balias%40example.com"
+
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02%2000:00:00"
 
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02%2000:00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
