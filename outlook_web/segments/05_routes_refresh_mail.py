@@ -2068,7 +2068,7 @@ def normalize_email_list_item(item: Dict[str, Any], folder: str) -> Dict[str, An
     row['date'] = row.get('date', '')
     row['is_read'] = bool(row.get('is_read', False))
     row['has_attachments'] = bool(row.get('has_attachments', False))
-    row['body_preview'] = row.get('body_preview', '')
+    row['body_preview'] = clean_email_preview(row.get('body_preview', ''))
     row['folder'] = row.get('folder') or folder
     row['id_mode'] = row.get('id_mode', '')
     return row

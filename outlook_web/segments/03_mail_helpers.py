@@ -912,8 +912,16 @@ def strip_html_content(html_text: str) -> str:
     text = re.sub(r'(?is)<script.*?>.*?</script>', ' ', html_text)
     text = re.sub(r'(?is)<style.*?>.*?</style>', ' ', text)
     text = re.sub(r'(?s)<[^>]+>', ' ', text)
+    text = html.unescape(text).replace('\xa0', ' ')
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
+
+
+def clean_email_preview(preview: Any) -> str:
+    value = str(preview or '')
+    if not value:
+        return ''
+    return strip_html_content(value)
 
 
 def extract_text_and_html(msg) -> tuple[str, str]:

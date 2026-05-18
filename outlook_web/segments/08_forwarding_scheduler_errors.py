@@ -1414,6 +1414,185 @@ def api_external_get_emails_v2():
     return jsonify(result)
 
 
+def parse_external_since_datetime(value: str) -> Optional[datetime]:
+    parsed = parse_email_datetime(str(value or '').strip())
+    return parsed
+
+
+def extract_text_from_raw_email_content(raw_content: Any) -> str:
+    if raw_content is None:
+        return ''
+    if isinstance(raw_content, str):
+        raw_bytes = raw_content.encode('utf-8', errors='replace')
+        fallback_text = raw_content
+    else:
+        raw_bytes = bytes(raw_content)
+        fallback_text = raw_bytes.decode('utf-8', errors='replace')
+
+    try:
+        msg = email.message_from_bytes(raw_bytes)
+        body_text, body_html = extract_text_and_html(msg)
+        extracted = body_text or strip_html_content(body_html)
+        if extracted:
+            return extracted
+    except Exception:
+        pass
+    return strip_html_content(fallback_text)
+
+
+def get_raw_email_for_external_code(account: Dict[str, Any], item: Dict[str, Any]) -> Optional[Any]:
+    message_id = str(item.get('id') or '').strip()
+    if not message_id:
+        return None
+
+    folder = normalize_folder_name(item.get('folder', 'inbox'))
+    proxy_url = get_account_proxy_url(account)
+    fallback_proxy_urls = get_account_proxy_failover_urls(account)
+
+    if account.get('account_type') == 'imap':
+        return get_raw_email_imap_generic(
+            account['email'],
+            account.get('imap_password', ''),
+            account.get('imap_host', ''),
+            account.get('imap_port', 993),
+            message_id,
+            folder,
+            account.get('provider', 'custom'),
+            proxy_url
+        )
+
+    id_mode = str(item.get('id_mode') or '').strip().lower()
+    if id_mode in {'uid', 'sequence'}:
+        return get_raw_email_imap(
+            account['email'],
+            account['client_id'],
+            account['refresh_token'],
+            message_id,
+            folder,
+            proxy_url,
+            fallback_proxy_urls,
+        )
+
+    raw_content = get_raw_email_graph(
+        account['client_id'],
+        account['refresh_token'],
+        message_id,
+        proxy_url,
+        fallback_proxy_urls,
+    )
+    if raw_content is not None:
+        return raw_content
+
+    return get_raw_email_imap(
+        account['email'],
+        account['client_id'],
+        account['refresh_token'],
+        message_id,
+        folder,
+        proxy_url,
+        fallback_proxy_urls,
+    )
+
+
+def parse_external_int_arg(name: str, default: int) -> tuple[Optional[int], Optional[str]]:
+    raw_value = request.args.get(name, default)
+    try:
+        return int(raw_value), None
+    except (TypeError, ValueError):
+        return None, f'{name} 参数必须是数字'
+
+
+@app.route('/api/external/verification-code', methods=['GET'])
+@csrf_exempt
+@api_key_required
+def api_external_verification_code():
+    email_addr = get_query_arg_preserve_plus('email', '').strip()
+    since_value = get_query_arg_preserve_plus('since', '').strip()
+    regex_value = get_query_arg_preserve_plus('regex', '').strip()
+    folder = normalize_folder_name(request.args.get('folder', 'all'))
+    top, top_error = parse_external_int_arg('top', 10)
+    if top_error:
+        return jsonify({'success': False, 'error': top_error}), 400
+
+    if not email_addr:
+        return jsonify({'success': False, 'error': '缺少 email 参数'}), 400
+    if not since_value:
+        return jsonify({'success': False, 'error': '缺少 since 参数'}), 400
+    if not regex_value:
+        return jsonify({'success': False, 'error': '缺少 regex 参数'}), 400
+
+    since_dt = parse_external_since_datetime(since_value)
+    if not since_dt:
+        return jsonify({'success': False, 'error': 'since 参数无效，请使用 ISO 时间或标准邮件时间'}), 400
+
+    try:
+        pattern = re.compile(regex_value, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+    except re.error as exc:
+        return jsonify({'success': False, 'error': f'regex 参数无效: {str(exc)}'}), 400
+
+    if folder not in VALID_MAIL_FOLDERS:
+        valid_folders = ', '.join(sorted(VALID_MAIL_FOLDERS))
+        return jsonify({'success': False, 'error': f'folder 参数无效，仅支持 {valid_folders}'}), 400
+
+    top = max(1, min(top, 50))
+    account = resolve_account_for_email_api(email_addr)
+    if not account:
+        return jsonify({'success': False, 'error': '邮箱账号不存在'}), 404
+
+    list_result = fetch_account_emails(account, folder, 0, top)
+    if not list_result.get('success'):
+        return jsonify(list_result)
+
+    sorted_items = sorted(
+        list_result.get('emails', []),
+        key=lambda item: parse_email_datetime(item.get('date')) or datetime.min,
+        reverse=True
+    )
+    checked_count = 0
+    for item in sorted_items:
+        message_dt = parse_email_datetime(item.get('date'))
+        if not message_dt or message_dt <= since_dt:
+            continue
+
+        checked_count += 1
+        raw_content = get_raw_email_for_external_code(account, item)
+        raw_text = extract_text_from_raw_email_content(raw_content)
+        if not raw_text:
+            continue
+
+        match = pattern.search(raw_text)
+        if not match:
+            continue
+
+        code = match.group(1) if match.groups() else match.group(0)
+        response = {
+            'success': True,
+            'code': code,
+            'message_id': item.get('id', ''),
+            'subject': item.get('subject', ''),
+            'from': item.get('from', ''),
+            'date': item.get('date', ''),
+            'folder': item.get('folder', folder),
+            'requested_email': email_addr,
+            'resolved_email': account.get('email', ''),
+            'checked_count': checked_count,
+        }
+        if account.get('matched_alias'):
+            response['matched_alias'] = account.get('matched_alias')
+        return jsonify(response)
+
+    response = {
+        'success': False,
+        'error': '未找到匹配的验证码',
+        'requested_email': email_addr,
+        'resolved_email': account.get('email', ''),
+        'checked_count': checked_count,
+    }
+    if account.get('matched_alias'):
+        response['matched_alias'] = account.get('matched_alias')
+    return jsonify(response), 404
+
+
 def email_matches_filters(account: Dict[str, Any], item: Dict[str, Any],
                           subject_contains: str = '', from_contains: str = '',
                           keyword: str = '') -> bool:

@@ -644,7 +644,7 @@ def api_external_get_accounts():
         safe_accounts.append(
             serialize_account_summary(
                 acc,
-                {},
+                None,
                 include_client_meta=False,
                 include_imap_meta=False
             )

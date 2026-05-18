@@ -400,8 +400,10 @@ user@example.com----app-password----imap.example.com----993
 - 使用主邮箱或别名邮箱取信
 - `folder=all` 一次聚合收件箱和垃圾邮件并按标准化后的邮件时间倒序排序，`top` 按每个文件夹分别计算
 - 支持按主题、发件人、关键词筛选列表
+- 邮件预览会自动去掉 HTML 标签、脚本、样式和 HTML 实体
 - 支持特殊字符别名，例如 `user+alias@example.com`
 - 默认 `top=1`
+- 支持从指定时间之后的邮件原文中按自定义正则提取验证码
 
 **配置步骤：**
 1. 点击「⚙️ 设置」→ 在「对外 API Key」处点击「🔑 随机生成」→ 保存
@@ -419,6 +421,9 @@ curl -H "X-API-Key: your-api-key" \
 
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:5000/api/external/emails?email=user%2Balias%40example.com"
+
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02T00:00:00%2B00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
 ```
 
 如果邮箱或别名里带特殊字符：

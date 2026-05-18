@@ -34,6 +34,7 @@
 | --- | --- | --- | --- | --- |
 | GET | `/api/external/accounts` | API Key | JSON | 获取普通邮箱账号列表 |
 | GET | `/api/external/emails` | API Key | JSON | 获取指定邮箱邮件列表 |
+| GET | `/api/external/verification-code` | API Key | JSON | 按邮箱、时间和正则从邮件原文提取验证码 |
 
 ### 分组、账号、标签、项目
 
@@ -354,6 +355,8 @@ curl -H "X-API-Key: your-api-key" \
 | `from_contains` | string | 否 | 仅保留发件人中包含该关键字的邮件 |
 | `keyword` | string | 否 | 在主题、预览、正文中做进一步关键字过滤 |
 
+返回的 `body_preview` 会自动去掉 HTML 标签、脚本、样式和 HTML 实体。
+
 #### 请求示例
 
 ```bash
@@ -410,6 +413,51 @@ curl -H "X-API-Key: your-api-key" \
   - `success: true`
   - `partial: true`
   - `details` 中包含失败文件夹的错误信息
+
+### GET `/api/external/verification-code`
+
+读取指定邮箱在指定时间之后的邮件原文，并用调用方传入的正则表达式提取验证码。该接口适合注册、登录、重置密码等需要直接取验证码的外部系统。
+
+#### 查询参数
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `email` | string | 是 | 主邮箱或别名邮箱，匹配规则与 `/api/external/emails` 一致 |
+| `since` | string | 是 | 只检查该时间之后的邮件，支持 ISO 时间，如 `2026-01-02T00:00:00+00:00` |
+| `regex` | string | 是 | 用于提取验证码的正则表达式；如果包含捕获组，返回第 1 个捕获组，否则返回完整匹配 |
+| `folder` | string | 否 | 默认 `all`，支持 `inbox`、`junkemail`、`deleteditems`、`all` |
+| `top` | int | 否 | 默认 `10`，最大 `50`；用于限制候选邮件列表数量 |
+
+#### 请求示例
+
+```bash
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02T00:00:00%2B00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
+```
+
+#### 成功响应示例
+
+```json
+{
+  "success": true,
+  "code": "654321",
+  "message_id": "AAMk...",
+  "subject": "Your verification code",
+  "from": "no-reply@example.com",
+  "date": "2026-01-02T08:30:00+00:00",
+  "folder": "inbox",
+  "requested_email": "user@outlook.com",
+  "resolved_email": "user@outlook.com",
+  "checked_count": 1
+}
+```
+
+#### 返回说明
+
+- 未找到匹配验证码时返回 HTTP `404` 和 `success=false`
+- `regex` 无法编译时返回 HTTP `400`
+- 原文读取会优先按邮件列表项的读取方式获取，Graph 失败时会尝试 IMAP 回退
+- 邮件原文会转成可匹配文本后再执行正则，HTML 正文会先去标签
 
 ## 内部 API
 

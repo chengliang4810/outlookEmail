@@ -630,6 +630,19 @@ class ExternalAccountsApiTests(unittest.TestCase):
         self.assertFalse(payload['success'])
         self.assertIn('API Key', payload['error'])
 
+    def test_external_verification_code_requires_api_key(self):
+        response = self.client.get(
+            '/api/external/verification-code'
+            '?email=user@outlook.com'
+            '&since=2026-01-02T00:00:00%2B00:00'
+            '&regex=(%5Cd%7B6%7D)'
+        )
+
+        self.assertEqual(response.status_code, 401)
+        payload = response.get_json()
+        self.assertFalse(payload['success'])
+        self.assertIn('API Key', payload['error'])
+
     def test_internal_emails_requires_login(self):
         response = self.client.get('/api/emails/user@outlook.com?folder=inbox')
 
@@ -847,6 +860,7 @@ class ExternalAccountsApiTests(unittest.TestCase):
         self.assertTrue(getattr(self.app.view_functions['api_update_account'], '_requires_login', False))
         self.assertTrue(getattr(self.app.view_functions['api_get_emails'], '_requires_login', False))
         self.assertTrue(getattr(self.app.view_functions['api_external_get_emails'], '_requires_api_key', False))
+        self.assertTrue(getattr(self.app.view_functions['api_external_verification_code'], '_requires_api_key', False))
 
     def test_external_accounts_returns_sanitized_accounts(self):
         with self.app.app_context():
@@ -1027,6 +1041,107 @@ class ExternalAccountsApiTests(unittest.TestCase):
         self.assertEqual(called_folder, 'inbox')
         self.assertEqual(called_skip, 0)
         self.assertEqual(called_top, 1)
+
+    def test_email_preview_strips_html_tags(self):
+        item = web_outlook_app.normalize_email_list_item(
+            {
+                'id': 'html-preview',
+                'subject': 'Preview',
+                'body_preview': '<div>验证码&nbsp;<strong>123456</strong></div><script>alert(1)</script>',
+            },
+            'inbox'
+        )
+
+        self.assertEqual(item['body_preview'], '验证码 123456')
+
+    def test_external_verification_code_rejects_invalid_regex(self):
+        response = self.client.get(
+            '/api/external/verification-code'
+            '?email=user@outlook.com'
+            '&since=2026-01-02T00:00:00%2B00:00'
+            '&regex=(',
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload['success'])
+        self.assertIn('regex 参数无效', payload['error'])
+
+    def test_external_verification_code_rejects_invalid_top(self):
+        response = self.client.get(
+            '/api/external/verification-code'
+            '?email=user@outlook.com'
+            '&since=2026-01-02T00:00:00%2B00:00'
+            '&regex=(%5Cd%7B6%7D)'
+            '&top=abc',
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload['success'])
+        self.assertIn('top 参数必须是数字', payload['error'])
+
+    def test_external_verification_code_extracts_from_raw_email_after_since(self):
+        email_list_result = {
+            'success': True,
+            'emails': [
+                {
+                    'id': 'new-message',
+                    'folder': 'inbox',
+                    'date': '2026-01-02T08:30:00+00:00',
+                    'subject': 'Your verification code',
+                    'from': 'no-reply@example.com',
+                    'body_preview': '验证码 654321',
+                    'id_mode': 'graph',
+                },
+                {
+                    'id': 'old-message',
+                    'folder': 'inbox',
+                    'date': '2026-01-01T08:30:00+00:00',
+                    'subject': 'Old code',
+                    'from': 'no-reply@example.com',
+                    'body_preview': '验证码 111111',
+                    'id_mode': 'graph',
+                },
+            ],
+            'method': 'Graph API',
+            'has_more': False,
+        }
+        raw_message = (
+            b'From: no-reply@example.com\r\n'
+            b'Subject: Your verification code\r\n'
+            b'Content-Type: text/html; charset=utf-8\r\n'
+            b'\r\n'
+            b'<html><body><p>Your code is <b>654321</b></p></body></html>'
+        )
+
+        with patch.object(web_outlook_app, 'fetch_account_emails', return_value=email_list_result) as fetch_mock:
+            with patch.object(web_outlook_app, 'get_raw_email_graph', return_value=raw_message) as raw_mock:
+                response = self.client.get(
+                    '/api/external/verification-code'
+                    '?email=user@outlook.com'
+                    '&folder=all'
+                    '&since=2026-01-02T00:00:00%2B00:00'
+                    '&regex=code%20is%5Cs*(%5Cd%7B6%7D)',
+                    headers={'X-API-Key': 'test-external-key'}
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload['success'])
+        self.assertEqual(payload['code'], '654321')
+        self.assertEqual(payload['message_id'], 'new-message')
+        self.assertEqual(payload['requested_email'], 'user@outlook.com')
+        self.assertEqual(payload['resolved_email'], 'user@outlook.com')
+        fetch_mock.assert_called_once()
+        called_account, called_folder, called_skip, called_top = fetch_mock.call_args.args
+        self.assertEqual(called_account['email'], 'user@outlook.com')
+        self.assertEqual(called_folder, 'all')
+        self.assertEqual(called_skip, 0)
+        self.assertEqual(called_top, 10)
+        raw_mock.assert_called_once()
 
 
 class BatchForwardingApiTests(unittest.TestCase):
