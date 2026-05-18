@@ -1424,6 +1424,26 @@ def parse_external_since_datetime(value: str) -> Optional[datetime]:
         return None
 
 
+def parse_external_message_datetime(value: str) -> Optional[datetime]:
+    if not value:
+        return None
+    value_str = str(value).strip()
+    try:
+        value_str = re.sub(r'\s+\([A-Za-z0-9_./+-]+\)$', '', value_str)
+        if re.match(r'^\d{4}-\d{2}-\d{2}T', value_str):
+            normalized = value_str.replace('Z', '+00:00')
+            dt = datetime.fromisoformat(normalized)
+        elif re.match(r'^\d{1,2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$', value_str):
+            dt = datetime.strptime(value_str, '%d-%b-%Y %H:%M:%S %z')
+        else:
+            dt = parsedate_to_datetime(value_str)
+        if dt.tzinfo is not None:
+            return dt.astimezone(get_app_timezone_info()).replace(tzinfo=None)
+        return dt
+    except Exception:
+        return None
+
+
 def extract_text_from_raw_email_content(raw_content: Any) -> str:
     if raw_content is None:
         return ''
@@ -1555,7 +1575,7 @@ def api_external_verification_code():
     )
     checked_count = 0
     for item in sorted_items:
-        message_dt = parse_email_datetime(item.get('date'))
+        message_dt = parse_external_message_datetime(item.get('date'))
         if not message_dt or message_dt <= since_dt:
             continue
 
