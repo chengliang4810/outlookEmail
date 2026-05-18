@@ -334,6 +334,60 @@ class ProjectRuntimeTests(unittest.TestCase):
         self.assertEqual(len(accounts), 2)
         self.assertEqual({item['project_status'] for item in accounts}, {'toClaim'})
 
+    def test_project_pool_management_assets_are_wired(self):
+        layout = pathlib.Path(ROOT_DIR, 'templates', 'partials', 'index', 'layout.html').read_text(encoding='utf-8')
+        dialogs = pathlib.Path(ROOT_DIR, 'templates', 'partials', 'index', 'dialogs-management.html').read_text(encoding='utf-8')
+        index = pathlib.Path(ROOT_DIR, 'templates', 'index.html').read_text(encoding='utf-8')
+        projects_js = pathlib.Path(ROOT_DIR, 'static', 'js', 'index', '11-projects.js').read_text(encoding='utf-8')
+
+        self.assertIn('showProjectPoolModal()', layout)
+        self.assertIn('项目池', layout)
+        self.assertIn('id="projectPoolModal"', dialogs)
+        self.assertIn('id="projectPoolList"', dialogs)
+        self.assertIn('id="projectPoolGroupList"', dialogs)
+        self.assertIn('id="projectPoolAccountList"', dialogs)
+        self.assertIn("js/index/11-projects.js", index)
+        self.assertIn("fetch('/api/projects'", projects_js)
+        self.assertIn("fetch('/api/projects/start'", projects_js)
+        self.assertIn('/reset-failed', projects_js)
+        self.assertIn('/remove-account', projects_js)
+        self.assertIn('/restore-account', projects_js)
+
+    def test_project_pool_modal_can_start_group_scoped_project(self):
+        group_a = self._create_group('Agent Pool A')
+        group_b = self._create_group('Agent Pool B')
+        self._insert_account('pool-a@example.com', group_id=group_a)
+        self._insert_account('pool-b@example.com', group_id=group_b)
+
+        response = self.client.post(
+            '/api/projects/start',
+            json={
+                'project_key': 'gpt',
+                'name': 'GPT 注册池',
+                'description': '管理界面创建',
+                'group_ids': [group_a],
+                'use_alias_email': True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload['success'])
+        self.assertEqual(payload['data']['project_key'], 'gpt')
+        self.assertEqual(payload['data']['scope_mode'], 'groups')
+        self.assertEqual(payload['data']['group_ids'], [group_a])
+        self.assertTrue(payload['data']['use_alias_email'])
+        self.assertEqual(payload['data']['added_count'], 1)
+
+        accounts_response = self.client.get('/api/projects/gpt/accounts')
+        accounts_payload = accounts_response.get_json()
+        self.assertEqual(accounts_response.status_code, 200)
+        self.assertTrue(accounts_payload['success'])
+        self.assertEqual(
+            [account['email'] for account in accounts_payload['data']['accounts']],
+            ['pool-a@example.com'],
+        )
+
     def test_start_project_group_scope_only_replenishes_matching_groups(self):
         group_a = self._create_group('Project Group A')
         group_b = self._create_group('Project Group B')

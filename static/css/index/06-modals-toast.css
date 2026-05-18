@@ -1263,6 +1263,379 @@
             margin: 0;
         }
 
+        .project-pool-modal-content {
+            width: min(1180px, calc(100vw - 32px));
+        }
+
+        .project-pool-modal-body {
+            padding: 18px;
+        }
+
+        .project-pool-shell {
+            display: grid;
+            grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        .project-pool-sidebar,
+        .project-pool-account-panel {
+            display: grid;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .project-pool-panel {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .project-pool-form,
+        .project-pool-account-panel {
+            padding: 16px;
+        }
+
+        .project-pool-panel__head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .project-pool-panel__head h4 {
+            margin: 0;
+            color: #111827;
+            font-size: 15px;
+            line-height: 1.25;
+        }
+
+        .project-pool-kicker {
+            margin-bottom: 4px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .project-pool-field-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .project-pool-field-head .form-label {
+            margin-bottom: 0;
+        }
+
+        .project-pool-group-list {
+            max-height: 188px;
+            overflow: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .project-pool-group-option {
+            display: flex;
+            cursor: pointer;
+            border-bottom: 1px solid #edf0f4;
+            background: #ffffff;
+        }
+
+        .project-pool-group-option:last-child {
+            border-bottom: none;
+        }
+
+        .project-pool-group-option input {
+            width: 16px;
+            margin: 12px 0 12px 12px;
+            accent-color: #111827;
+        }
+
+        .project-pool-group-option__body {
+            display: grid;
+            grid-template-columns: 12px minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+            width: 100%;
+            min-width: 0;
+            padding: 10px 12px 10px 8px;
+            font-size: 13px;
+            color: #111827;
+        }
+
+        .project-pool-group-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+        }
+
+        .project-pool-group-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .project-pool-group-count {
+            color: #64748b;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .project-pool-alias-toggle {
+            margin-bottom: 14px;
+        }
+
+        .project-pool-form-actions,
+        .project-pool-account-tools {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .project-pool-list {
+            display: grid;
+            max-height: 330px;
+            overflow: auto;
+            border-top: 1px solid #eef2f7;
+        }
+
+        .project-pool-card {
+            display: grid;
+            gap: 8px;
+            width: 100%;
+            padding: 13px 14px;
+            border: 0;
+            border-bottom: 1px solid #eef2f7;
+            background: #ffffff;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .project-pool-card:hover,
+        .project-pool-card.is-active {
+            background: #f8fafc;
+        }
+
+        .project-pool-card.is-active {
+            box-shadow: inset 3px 0 0 #111827;
+        }
+
+        .project-pool-card__main {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .project-pool-card__title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #111827;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .project-pool-card__key,
+        .project-pool-card__meta {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .project-pool-card__key {
+            flex-shrink: 0;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        }
+
+        .project-pool-stats {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .project-pool-stats span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            min-height: 24px;
+            padding: 0 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .project-pool-stats strong {
+            color: #111827;
+        }
+
+        .project-pool-account-head {
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .project-pool-account-heading {
+            min-width: 0;
+        }
+
+        .project-pool-selected-meta {
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .project-pool-account-tools .form-select,
+        .project-pool-account-tools .form-input {
+            width: auto;
+            min-width: 150px;
+        }
+
+        .project-pool-account-tools .form-input {
+            min-width: 210px;
+        }
+
+        .project-pool-account-list {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+
+        .project-pool-account-table-wrap {
+            max-height: 590px;
+            overflow: auto;
+        }
+
+        .project-pool-account-table {
+            width: 100%;
+            min-width: 820px;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .project-pool-account-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            padding: 12px 14px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        .project-pool-account-row td {
+            padding: 13px 14px;
+            border-bottom: 1px solid #eef2f7;
+            vertical-align: top;
+        }
+
+        .project-pool-account-row:last-child td {
+            border-bottom: none;
+        }
+
+        .project-pool-account-email {
+            max-width: 340px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #111827;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .project-pool-account-meta,
+        .project-pool-account-time,
+        .project-pool-account-caller,
+        .project-pool-action-muted {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .project-pool-account-caller {
+            color: #111827;
+            font-weight: 600;
+        }
+
+        .project-pool-row-detail {
+            margin-top: 6px;
+            color: #b42318;
+            font-size: 12px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .project-pool-status-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 26px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: #eef2f7;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .project-pool-status-pill.ready {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .project-pool-status-pill.running {
+            background: #fff4e5;
+            color: #b45309;
+        }
+
+        .project-pool-status-pill.done {
+            background: #e7f8ee;
+            color: #137333;
+        }
+
+        .project-pool-status-pill.failed {
+            background: #fdebec;
+            color: #b42318;
+        }
+
+        .project-pool-status-pill.removed,
+        .project-pool-status-pill.deleted {
+            background: #f1f3f5;
+            color: #6b7280;
+        }
+
+        .project-pool-account-actions {
+            width: 120px;
+            white-space: nowrap;
+        }
+
+        .project-pool-account-actions .btn + .btn {
+            margin-left: 6px;
+        }
+
+        .project-pool-empty {
+            padding: 24px 16px;
+            color: #64748b;
+            font-size: 13px;
+            text-align: center;
+        }
+
         @media (min-width: 980px) {
             .settings-shell {
                 grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
@@ -1295,6 +1668,7 @@
 
         @media (max-width: 860px) {
             .refresh-snapshot-grid,
+            .project-pool-shell,
             .forwarding-toolbar__controls,
             .settings-panel-grid,
             .settings-grid,
@@ -1330,6 +1704,20 @@
             .settings-action-row--toolbar {
                 justify-content: flex-start;
             }
+
+            .project-pool-account-head {
+                display: grid;
+            }
+
+            .project-pool-account-tools {
+                align-items: stretch;
+            }
+
+            .project-pool-account-tools .form-select,
+            .project-pool-account-tools .form-input,
+            .project-pool-account-tools .btn {
+                width: 100%;
+            }
         }
 
         @media (max-width: 1180px) {
@@ -1339,6 +1727,7 @@
         }
 
         @media (max-width: 979px) {
+            .project-pool-modal-content,
             .settings-modal-content {
                 width: min(920px, calc(100vw - 28px));
             }
