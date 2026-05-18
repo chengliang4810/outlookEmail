@@ -749,9 +749,38 @@ def api_claim_project_account(project_key):
     return jsonify({'success': True, 'data': account})
 
 
-@app.route('/api/projects/<project_key>/complete-success', methods=['POST'])
-@login_required
-def api_complete_project_success(project_key):
+@app.route('/api/external/projects/<project_key>/claim-random', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_claim_project_account(project_key):
+    data = request.get_json(silent=True) or {}
+    caller_id = (data.get('caller_id') or '').strip()
+    task_id = (data.get('task_id') or '').strip()
+    lease_seconds = data.get('lease_seconds', 600)
+    try:
+        account = claim_project_account(project_key, caller_id, task_id, lease_seconds)
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+    if not account:
+        return jsonify({'success': False, 'error': '没有可领取的项目邮箱'}), 200
+    return jsonify({'success': True, 'data': account})
+
+
+@app.route('/api/external/accounts/claim', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_claim_account_alias():
+    data = request.get_json(silent=True) or {}
+    project_key = (data.get('project_key') or '').strip()
+    if not project_key:
+        return jsonify({'success': False, 'error': '缺少 project_key 参数'}), 400
+    return api_external_claim_project_account(project_key)
+
+
+def build_project_claim_completion_response(project_key: str, action: str):
     data = request.get_json(silent=True) or {}
     account_id = data.get('account_id')
     claim_token = (data.get('claim_token') or '').strip()
@@ -761,43 +790,94 @@ def api_complete_project_success(project_key):
     if not account_id or not claim_token:
         return jsonify({'success': False, 'error': '缺少 account_id 或 claim_token'}), 400
 
-    if complete_project_account_success(project_key, int(account_id), claim_token, caller_id, task_id, detail):
-        return jsonify({'success': True, 'message': '项目账号已标记成功'})
+    try:
+        account_id_int = int(account_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'account_id 参数必须是数字'}), 400
+
+    if action == 'success':
+        ok = complete_project_account_success(project_key, account_id_int, claim_token, caller_id, task_id, detail)
+        message = '项目账号已标记成功'
+    elif action == 'failed':
+        ok = complete_project_account_failed(project_key, account_id_int, claim_token, caller_id, task_id, detail)
+        message = '项目账号已标记失败'
+    elif action == 'release':
+        ok = release_project_account(project_key, account_id_int, claim_token, caller_id, task_id, detail)
+        message = '项目账号已释放'
+    else:
+        return jsonify({'success': False, 'error': '项目账号操作无效'}), 400
+
+    if ok:
+        return jsonify({'success': True, 'message': message})
     return jsonify({'success': False, 'error': '项目账号状态不匹配'}), 400
+
+
+@app.route('/api/projects/<project_key>/complete-success', methods=['POST'])
+@login_required
+def api_complete_project_success(project_key):
+    return build_project_claim_completion_response(project_key, 'success')
+
+
+@app.route('/api/external/projects/<project_key>/complete-success', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_complete_project_success(project_key):
+    return build_project_claim_completion_response(project_key, 'success')
 
 
 @app.route('/api/projects/<project_key>/complete-failed', methods=['POST'])
 @login_required
 def api_complete_project_failed(project_key):
-    data = request.get_json(silent=True) or {}
-    account_id = data.get('account_id')
-    claim_token = (data.get('claim_token') or '').strip()
-    caller_id = (data.get('caller_id') or '').strip()
-    task_id = (data.get('task_id') or '').strip()
-    detail = sanitize_input(data.get('detail', ''), max_length=500)
-    if not account_id or not claim_token:
-        return jsonify({'success': False, 'error': '缺少 account_id 或 claim_token'}), 400
+    return build_project_claim_completion_response(project_key, 'failed')
 
-    if complete_project_account_failed(project_key, int(account_id), claim_token, caller_id, task_id, detail):
-        return jsonify({'success': True, 'message': '项目账号已标记失败'})
-    return jsonify({'success': False, 'error': '项目账号状态不匹配'}), 400
+
+@app.route('/api/external/projects/<project_key>/complete-failed', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_complete_project_failed(project_key):
+    return build_project_claim_completion_response(project_key, 'failed')
 
 
 @app.route('/api/projects/<project_key>/release', methods=['POST'])
 @login_required
 def api_release_project_account(project_key):
-    data = request.get_json(silent=True) or {}
-    account_id = data.get('account_id')
-    claim_token = (data.get('claim_token') or '').strip()
-    caller_id = (data.get('caller_id') or '').strip()
-    task_id = (data.get('task_id') or '').strip()
-    detail = sanitize_input(data.get('detail', ''), max_length=500)
-    if not account_id or not claim_token:
-        return jsonify({'success': False, 'error': '缺少 account_id 或 claim_token'}), 400
+    return build_project_claim_completion_response(project_key, 'release')
 
-    if release_project_account(project_key, int(account_id), claim_token, caller_id, task_id, detail):
-        return jsonify({'success': True, 'message': '项目账号已释放'})
-    return jsonify({'success': False, 'error': '项目账号状态不匹配'}), 400
+
+@app.route('/api/external/projects/<project_key>/release', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_release_project_account(project_key):
+    return build_project_claim_completion_response(project_key, 'release')
+
+
+def build_external_account_alias_completion_response(action: str):
+    data = request.get_json(silent=True) or {}
+    project_key = (data.get('project_key') or '').strip()
+    if not project_key:
+        return jsonify({'success': False, 'error': '缺少 project_key 参数'}), 400
+    return build_project_claim_completion_response(project_key, action)
+
+
+@app.route('/api/external/accounts/complete-success', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_complete_account_success_alias():
+    return build_external_account_alias_completion_response('success')
+
+
+@app.route('/api/external/accounts/complete-failed', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_complete_account_failed_alias():
+    return build_external_account_alias_completion_response('failed')
+
+
+@app.route('/api/external/accounts/release', methods=['POST'])
+@csrf_exempt
+@api_key_required
+def api_external_release_account_alias():
+    return build_external_account_alias_completion_response('release')
 
 
 @app.route('/api/projects/<project_key>/reset-failed', methods=['POST'])

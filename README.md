@@ -405,6 +405,7 @@ user@example.com----app-password----imap.example.com----993
 - 查询 `@gmail.com` / `@googlemail.com` 地址时，原后缀未命中会自动回退到另一个后缀
 - 默认 `top=1`
 - 支持从指定时间之后的邮件原文中提取验证码，未传 `regex` 时默认去掉 HTML 后提取 4-6 位连续数字
+- 支持通过项目邮箱领取接口做并发占用，避免多个任务同时拿到同一个邮箱
 
 **配置步骤：**
 1. 点击「⚙️ 设置」→ 在「对外 API Key」处点击「🔑 随机生成」→ 保存
@@ -428,6 +429,10 @@ curl -H "X-API-Key: your-api-key" \
 
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02%2000:00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
+
+curl -X POST -H "X-API-Key: your-api-key" -H "Content-Type: application/json" \
+  -d '{"project_key":"gpt","caller_id":"worker-1","task_id":"task-001","lease_seconds":600}' \
+  "http://localhost:5000/api/external/accounts/claim"
 ```
 
 如果邮箱或别名里带特殊字符：
