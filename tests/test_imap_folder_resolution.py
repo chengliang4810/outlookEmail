@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 import unittest
 from email.message import EmailMessage
 from unittest.mock import patch
@@ -1169,6 +1170,58 @@ class ExternalAccountsApiTests(unittest.TestCase):
         self.assertEqual(called_skip, 0)
         self.assertEqual(called_top, 10)
         raw_mock.assert_called_once()
+
+    def test_external_verification_code_compares_since_in_app_timezone(self):
+        email_list_result = {
+            'success': True,
+            'emails': [
+                {
+                    'id': 'new-message',
+                    'folder': 'inbox',
+                    'date': '18-May-2026 01:45:42 +0800',
+                    'subject': '你的 ChatGPT 临时验证码',
+                    'from': 'OpenAI <otp@example.com>',
+                    'body_preview': '输入此临时验证码以继续： 239637',
+                    'id_mode': 'sequence',
+                },
+            ],
+            'method': 'IMAP (New)',
+            'has_more': False,
+        }
+        raw_message = (
+            b'From: otp@example.com\r\n'
+            b'Subject: Code\r\n'
+            b'Content-Type: text/plain; charset=utf-8\r\n'
+            b'\r\n'
+            b'Code: 239637'
+        )
+
+        original_tz = os.environ.get('TZ')
+        os.environ['TZ'] = 'UTC'
+        time.tzset()
+        try:
+            with patch.object(web_outlook_app, 'fetch_account_emails', return_value=email_list_result):
+                with patch.object(web_outlook_app, 'get_raw_email_imap', return_value=raw_message):
+                    response = self.client.get(
+                        '/api/external/verification-code'
+                        '?email=user@outlook.com'
+                        '&folder=all'
+                        '&since=2026-05-18%2001:44:00'
+                        '&regex=%28%5B0-9%5D%7B6%7D%29',
+                        headers={'X-API-Key': 'test-external-key'}
+                    )
+        finally:
+            if original_tz is None:
+                os.environ.pop('TZ', None)
+            else:
+                os.environ['TZ'] = original_tz
+            time.tzset()
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload['success'])
+        self.assertEqual(payload['code'], '239637')
+        self.assertEqual(payload['checked_count'], 1)
 
 
 class BatchForwardingApiTests(unittest.TestCase):
