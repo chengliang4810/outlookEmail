@@ -1054,11 +1054,24 @@ class ExternalAccountsApiTests(unittest.TestCase):
 
         self.assertEqual(item['body_preview'], '验证码 123456')
 
+    def test_email_preview_truncates_after_stripping_html_tags(self):
+        item = web_outlook_app.normalize_email_list_item(
+            {
+                'id': 'long-html-preview',
+                'subject': 'Preview',
+                'body_preview': '<div>1234567890<strong>ABCDEFGHIJ</strong></div>',
+            },
+            'inbox'
+        )
+
+        self.assertEqual(item['body_preview'], '1234567890ABCDEFGHIJ')
+        self.assertNotIn('<strong>', item['body_preview'])
+
     def test_external_verification_code_rejects_invalid_regex(self):
         response = self.client.get(
             '/api/external/verification-code'
             '?email=user@outlook.com'
-            '&since=2026-01-02T00:00:00%2B00:00'
+            '&since=2026-01-02%2000:00:00'
             '&regex=(',
             headers={'X-API-Key': 'test-external-key'}
         )
@@ -1072,7 +1085,7 @@ class ExternalAccountsApiTests(unittest.TestCase):
         response = self.client.get(
             '/api/external/verification-code'
             '?email=user@outlook.com'
-            '&since=2026-01-02T00:00:00%2B00:00'
+            '&since=2026-01-02%2000:00:00'
             '&regex=(%5Cd%7B6%7D)'
             '&top=abc',
             headers={'X-API-Key': 'test-external-key'}
@@ -1082,6 +1095,20 @@ class ExternalAccountsApiTests(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload['success'])
         self.assertIn('top 参数必须是数字', payload['error'])
+
+    def test_external_verification_code_rejects_non_standard_since_format(self):
+        response = self.client.get(
+            '/api/external/verification-code'
+            '?email=user@outlook.com'
+            '&since=2026-01-02T00:00:00%2B00:00'
+            '&regex=(%5Cd%7B6%7D)',
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload['success'])
+        self.assertIn('yyyy-MM-dd HH:mm:ss', payload['error'])
 
     def test_external_verification_code_extracts_from_raw_email_after_since(self):
         email_list_result = {
@@ -1123,7 +1150,7 @@ class ExternalAccountsApiTests(unittest.TestCase):
                     '/api/external/verification-code'
                     '?email=user@outlook.com'
                     '&folder=all'
-                    '&since=2026-01-02T00:00:00%2B00:00'
+                    '&since=2026-01-02%2000:00:00'
                     '&regex=code%20is%5Cs*(%5Cd%7B6%7D)',
                     headers={'X-API-Key': 'test-external-key'}
                 )

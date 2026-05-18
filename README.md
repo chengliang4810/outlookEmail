@@ -423,7 +423,7 @@ curl -H "X-API-Key: your-api-key" \
   "http://localhost:5000/api/external/emails?email=user%2Balias%40example.com"
 
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02T00:00:00%2B00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
+  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02%2000:00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
 ```
 
 如果邮箱或别名里带特殊字符：
