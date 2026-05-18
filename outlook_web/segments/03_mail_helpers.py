@@ -788,7 +788,7 @@ def get_emails_imap_with_server(account: str, client_id: str, refresh_token: str
                     raw_email = msg_data[0][1]
                     internal_date = extract_imap_internaldate(msg_data[0][0])
                     msg = email.message_from_bytes(raw_email)
-                    body_preview = get_email_body(msg)
+                    body_preview = clean_email_preview(get_email_body(msg))
 
                     emails.append({
                         'id': msg_id.decode() if isinstance(msg_id, bytes) else str(msg_id),
@@ -797,7 +797,7 @@ def get_emails_imap_with_server(account: str, client_id: str, refresh_token: str
                         'to': decode_header_value(msg.get("To", "")),
                         'date': internal_date or msg.get("Date", "未知时间"),
                         'id_mode': 'sequence',
-                        'body_preview': body_preview[:200] + "..." if len(body_preview) > 200 else body_preview
+                        'body_preview': body_preview
                     })
             except Exception:
                 continue
@@ -911,17 +911,21 @@ def strip_html_content(html_text: str) -> str:
         return ''
     text = re.sub(r'(?is)<script.*?>.*?</script>', ' ', html_text)
     text = re.sub(r'(?is)<style.*?>.*?</style>', ' ', text)
-    text = re.sub(r'(?s)<[^>]+>', ' ', text)
+    text = re.sub(r'(?is)<\s*(br|/p|/div|/li|/tr|/table|/section|/article|/h[1-6])\b[^>]*>', ' ', text)
+    text = re.sub(r'(?s)<[^>]+>', '', text)
     text = html.unescape(text).replace('\xa0', ' ')
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 
-def clean_email_preview(preview: Any) -> str:
+def clean_email_preview(preview: Any, max_length: int = 200) -> str:
     value = str(preview or '')
     if not value:
         return ''
-    return strip_html_content(value)
+    cleaned = strip_html_content(value)
+    if max_length > 0 and len(cleaned) > max_length:
+        return cleaned[:max_length] + '...'
+    return cleaned
 
 
 def extract_text_and_html(msg) -> tuple[str, str]:
@@ -1734,8 +1738,7 @@ def get_emails_imap_generic(email_addr: str, imap_password: str, imap_host: str,
 
                 msg = email.message_from_bytes(raw_email)
                 body_text, body_html = extract_text_and_html(msg)
-                preview_source = body_text or strip_html_content(body_html)
-                preview = preview_source[:200] + ('...' if len(preview_source) > 200 else '')
+                preview = clean_email_preview(body_text or body_html)
                 emails_data.append({
                     'id': uid.decode('utf-8', errors='ignore') if isinstance(uid, (bytes, bytearray)) else str(uid),
                     'subject': decode_header_value(msg.get('Subject', '无主题')),

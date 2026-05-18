@@ -355,7 +355,7 @@ curl -H "X-API-Key: your-api-key" \
 | `from_contains` | string | 否 | 仅保留发件人中包含该关键字的邮件 |
 | `keyword` | string | 否 | 在主题、预览、正文中做进一步关键字过滤 |
 
-返回的 `body_preview` 会自动去掉 HTML 标签、脚本、样式和 HTML 实体。
+返回的 `body_preview` 会先去掉 HTML 标签、脚本、样式和 HTML 实体，再按预览长度截取。
 
 #### 请求示例
 
@@ -423,7 +423,7 @@ curl -H "X-API-Key: your-api-key" \
 | 参数 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `email` | string | 是 | 主邮箱或别名邮箱，匹配规则与 `/api/external/emails` 一致 |
-| `since` | string | 是 | 只检查该时间之后的邮件，支持 ISO 时间，如 `2026-01-02T00:00:00+00:00` |
+| `since` | string | 是 | 只检查该时间之后的邮件，格式固定为 `yyyy-MM-dd HH:mm:ss`，如 `2026-01-02 00:00:00` |
 | `regex` | string | 是 | 用于提取验证码的正则表达式；如果包含捕获组，返回第 1 个捕获组，否则返回完整匹配 |
 | `folder` | string | 否 | 默认 `all`，支持 `inbox`、`junkemail`、`deleteditems`、`all` |
 | `top` | int | 否 | 默认 `10`，最大 `50`；用于限制候选邮件列表数量 |
@@ -432,7 +432,7 @@ curl -H "X-API-Key: your-api-key" \
 
 ```bash
 curl -H "X-API-Key: your-api-key" \
-  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02T00:00:00%2B00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
+  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02%2000:00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
 ```
 
 #### 成功响应示例

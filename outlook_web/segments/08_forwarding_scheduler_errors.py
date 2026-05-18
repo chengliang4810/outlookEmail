@@ -1415,8 +1415,13 @@ def api_external_get_emails_v2():
 
 
 def parse_external_since_datetime(value: str) -> Optional[datetime]:
-    parsed = parse_email_datetime(str(value or '').strip())
-    return parsed
+    value_str = str(value or '').strip()
+    if not re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', value_str):
+        return None
+    try:
+        return datetime.strptime(value_str, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        return None
 
 
 def extract_text_from_raw_email_content(raw_content: Any) -> str:
@@ -1523,7 +1528,7 @@ def api_external_verification_code():
 
     since_dt = parse_external_since_datetime(since_value)
     if not since_dt:
-        return jsonify({'success': False, 'error': 'since 参数无效，请使用 ISO 时间或标准邮件时间'}), 400
+        return jsonify({'success': False, 'error': 'since 参数无效，请使用 yyyy-MM-dd HH:mm:ss 格式'}), 400
 
     try:
         pattern = re.compile(regex_value, re.IGNORECASE | re.MULTILINE | re.DOTALL)
