@@ -418,7 +418,7 @@ curl -H "X-API-Key: your-api-key" \
 
 ### GET `/api/external/verification-code`
 
-读取指定邮箱在指定时间之后的邮件原文，并用调用方传入的正则表达式提取验证码。该接口适合注册、登录、重置密码等需要直接取验证码的外部系统。
+读取指定邮箱在指定时间之后的邮件原文，并提取验证码。调用方可以传入自定义正则；未传 `regex` 时，接口会先去掉 HTML 标签、脚本、样式和实体，再按默认规则提取 4-6 位连续数字。该接口适合注册、登录、重置密码等需要直接取验证码的外部系统。
 
 #### 查询参数
 
@@ -426,13 +426,16 @@ curl -H "X-API-Key: your-api-key" \
 | --- | --- | --- | --- |
 | `email` | string | 是 | 主邮箱或别名邮箱，匹配规则与 `/api/external/emails` 一致 |
 | `since` | string | 是 | 只检查该时间之后的邮件，格式固定为 `yyyy-MM-dd HH:mm:ss`，如 `2026-01-02 00:00:00` |
-| `regex` | string | 是 | 用于提取验证码的正则表达式；如果包含捕获组，返回第 1 个捕获组，否则返回完整匹配 |
+| `regex` | string | 否 | 用于提取验证码的正则表达式；如果包含捕获组，返回第 1 个捕获组，否则返回完整匹配；未传时默认提取独立的 4-6 位连续数字 |
 | `folder` | string | 否 | 默认 `all`，支持 `inbox`、`junkemail`、`deleteditems`、`all` |
 | `top` | int | 否 | 默认 `10`，最大 `50`；用于限制候选邮件列表数量 |
 
 #### 请求示例
 
 ```bash
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02%2000:00:00"
+
 curl -H "X-API-Key: your-api-key" \
   "http://localhost:5000/api/external/verification-code?email=user@outlook.com&since=2026-01-02%2000:00:00&regex=code%20is%5Cs*(%5Cd%7B6%7D)"
 ```
@@ -459,7 +462,7 @@ curl -H "X-API-Key: your-api-key" \
 - 未找到匹配验证码时返回 HTTP `404` 和 `success=false`
 - `regex` 无法编译时返回 HTTP `400`
 - 原文读取会优先按邮件列表项的读取方式获取，Graph 失败时会尝试 IMAP 回退
-- 邮件原文会转成可匹配文本后再执行正则，HTML 正文会先去标签
+- 邮件原文会转成可匹配文本后再执行正则，HTML 正文会先去标签；未传 `regex` 时使用默认 4-6 位数字规则
 
 #### Gmail / Googlemail 后缀回退
 

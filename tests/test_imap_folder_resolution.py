@@ -1198,6 +1198,48 @@ class ExternalAccountsApiTests(unittest.TestCase):
         self.assertEqual(called_top, 10)
         raw_mock.assert_called_once()
 
+    def test_external_verification_code_defaults_to_stripped_html_digit_code(self):
+        email_list_result = {
+            'success': True,
+            'emails': [
+                {
+                    'id': 'html-code-message',
+                    'folder': 'inbox',
+                    'date': '2026-01-02T08:30:00+08:00',
+                    'subject': 'Your verification code',
+                    'from': 'no-reply@example.com',
+                    'body_preview': '<span>验证码 246810</span>',
+                    'id_mode': 'graph',
+                },
+            ],
+            'method': 'Graph API',
+            'has_more': False,
+        }
+        raw_message = (
+            b'From: no-reply@example.com\r\n'
+            b'Subject: Your verification code\r\n'
+            b'Content-Type: text/html; charset=utf-8\r\n'
+            b'\r\n'
+            b'<html><head><style>.pin{color:#123456}</style></head>'
+            b'<body><p>Your verification code is <b>246810</b></p></body></html>'
+        )
+
+        with patch.object(web_outlook_app, 'fetch_account_emails', return_value=email_list_result):
+            with patch.object(web_outlook_app, 'get_raw_email_graph', return_value=raw_message):
+                response = self.client.get(
+                    '/api/external/verification-code'
+                    '?email=user@outlook.com'
+                    '&folder=all'
+                    '&since=2026-01-02%2008:00:00',
+                    headers={'X-API-Key': 'test-external-key'}
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload['success'])
+        self.assertEqual(payload['code'], '246810')
+        self.assertEqual(payload['checked_count'], 1)
+
     def test_external_verification_code_compares_since_in_app_timezone(self):
         email_list_result = {
             'success': True,
