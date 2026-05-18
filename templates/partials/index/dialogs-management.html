@@ -699,6 +699,105 @@
         </div>
     </div>
 
+    <!-- 项目池管理模态框 -->
+    <div class="modal" id="projectPoolModal" onmousedown="if(event.target === this) hideProjectPoolModal()">
+        <div class="modal-content project-pool-modal-content">
+            <div class="modal-header">
+                <h3>项目池</h3>
+                <button class="modal-close" onclick="hideProjectPoolModal()">&times;</button>
+            </div>
+            <div class="modal-body project-pool-modal-body">
+                <div class="project-pool-shell">
+                    <aside class="project-pool-sidebar">
+                        <section class="project-pool-panel project-pool-form">
+                            <div class="project-pool-panel__head">
+                                <div>
+                                    <div class="project-pool-kicker">Pool</div>
+                                    <h4>创建 / 同步</h4>
+                                </div>
+                            </div>
+                            <div class="settings-panel-grid settings-panel-grid--compact">
+                                <div class="form-group">
+                                    <label class="form-label" for="projectPoolKey">项目标识</label>
+                                    <input type="text" class="form-input" id="projectPoolKey" placeholder="gpt">
+                                    <div class="form-hint">外部接口传递的 <code>project_key</code>。</div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="projectPoolName">项目名称</label>
+                                    <input type="text" class="form-input" id="projectPoolName" placeholder="GPT 注册池">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="projectPoolDescription">备注</label>
+                                <textarea class="form-textarea" id="projectPoolDescription" rows="2" placeholder="可选"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <div class="project-pool-field-head">
+                                    <label class="form-label">绑定分组</label>
+                                    <button class="btn btn-sm btn-secondary" type="button" onclick="clearProjectPoolGroups()">全量</button>
+                                </div>
+                                <div class="project-pool-group-list" id="projectPoolGroupList">
+                                    <div class="project-pool-empty">加载分组中...</div>
+                                </div>
+                                <div class="form-hint">未勾选时同步全部普通邮箱分组；勾选后只从所选分组进入号池。</div>
+                            </div>
+                            <label class="settings-toggle settings-toggle--card project-pool-alias-toggle">
+                                <input type="checkbox" id="projectPoolUseAliasEmail">
+                                <span class="form-label">使用别名邮箱进入号池</span>
+                            </label>
+                            <div class="project-pool-form-actions">
+                                <button class="btn btn-primary" type="button" id="saveProjectPoolBtn" onclick="saveProjectPool()">创建 / 同步</button>
+                                <button class="btn btn-secondary" type="button" onclick="resetProjectPoolForm()">清空</button>
+                            </div>
+                        </section>
+
+                        <section class="project-pool-panel">
+                            <div class="project-pool-panel__head">
+                                <div>
+                                    <div class="project-pool-kicker">Projects</div>
+                                    <h4>项目列表</h4>
+                                </div>
+                                <button class="btn btn-sm btn-secondary" type="button" onclick="loadProjectPools()">刷新</button>
+                            </div>
+                            <div class="project-pool-list" id="projectPoolList">
+                                <div class="project-pool-empty">加载中...</div>
+                            </div>
+                        </section>
+                    </aside>
+
+                    <section class="project-pool-panel project-pool-account-panel">
+                        <div class="project-pool-panel__head project-pool-account-head">
+                            <div class="project-pool-account-heading">
+                                <div class="project-pool-kicker">Accounts</div>
+                                <h4 id="projectPoolSelectedTitle">请选择项目池</h4>
+                                <div class="project-pool-selected-meta" id="projectPoolSelectedMeta">创建或选择一个项目池后查看邮箱状态。</div>
+                            </div>
+                            <div class="project-pool-account-tools">
+                                <select class="form-select" id="projectPoolStatusFilter" onchange="handleProjectPoolStatusChange(this.value)">
+                                    <option value="">全部状态</option>
+                                    <option value="toClaim">待领取</option>
+                                    <option value="claiming">领取中</option>
+                                    <option value="done">已完成</option>
+                                    <option value="failed">失败</option>
+                                    <option value="removed">已移除</option>
+                                    <option value="deleted">已删除</option>
+                                </select>
+                                <input type="search" class="form-input" id="projectPoolKeyword" placeholder="搜索邮箱 / 备注" oninput="handleProjectPoolKeywordInput()">
+                                <button class="btn btn-secondary" type="button" onclick="refreshSelectedProjectPool()">刷新邮箱</button>
+                            </div>
+                        </div>
+                        <div class="project-pool-account-list" id="projectPoolAccountList">
+                            <div class="project-pool-empty">暂无选中的项目池</div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideProjectPoolModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 通用确认模态框 -->
     <div class="modal" id="genericConfirmModal" onmousedown="if(event.target === this) hideGenericConfirmModal()">
         <div class="modal-content" style="width: 420px;">
