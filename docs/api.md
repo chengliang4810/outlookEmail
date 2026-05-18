@@ -33,8 +33,16 @@
 | 方法 | 路径 | 鉴权 | 返回类型 | 说明 |
 | --- | --- | --- | --- | --- |
 | GET | `/api/external/accounts` | API Key | JSON | 获取普通邮箱账号列表 |
+| POST | `/api/external/accounts/claim` | API Key | JSON | 领取项目邮箱，`project_key` 放在请求体 |
+| POST | `/api/external/accounts/complete-success` | API Key | JSON | 标记项目邮箱成功，`project_key` 放在请求体 |
+| POST | `/api/external/accounts/complete-failed` | API Key | JSON | 标记项目邮箱失败，`project_key` 放在请求体 |
+| POST | `/api/external/accounts/release` | API Key | JSON | 释放领取中的项目邮箱，`project_key` 放在请求体 |
 | GET | `/api/external/emails` | API Key | JSON | 获取指定邮箱邮件列表 |
 | GET | `/api/external/verification-code` | API Key | JSON | 按邮箱、时间和正则从邮件原文提取验证码 |
+| POST | `/api/external/projects/<project_key>/claim-random` | API Key | JSON | 领取项目邮箱 |
+| POST | `/api/external/projects/<project_key>/complete-success` | API Key | JSON | 标记项目邮箱成功 |
+| POST | `/api/external/projects/<project_key>/complete-failed` | API Key | JSON | 标记项目邮箱失败 |
+| POST | `/api/external/projects/<project_key>/release` | API Key | JSON | 释放领取中的项目邮箱 |
 
 ### 分组、账号、标签、项目
 
@@ -1035,7 +1043,9 @@ curl -H "X-API-Key: your-api-key" \
 
 从项目里随机领取一个可用邮箱。
 
-当前实现会从项目内 `status='toClaim'` 的邮箱中选取一个，并确保该邮箱没有被其他项目中的 `claiming` 记录占用。
+当前实现会从项目内 `status='toClaim'` 的邮箱中选取一个，并确保该邮箱没有被其他项目中的 `claiming` 记录占用。领取操作在数据库事务里完成，同一个 `caller_id` 并发请求也会领取不同邮箱；`caller_id` 和 `task_id` 只用于记录调用方和任务，不作为幂等键。
+
+外部系统可使用 API Key 版本路径 `/api/external/projects/<project_key>/claim-random`，请求体和响应体与本接口一致。也可以调用通用路径 `/api/external/accounts/claim`，并在请求体中增加 `project_key`。
 
 #### 请求体
 
@@ -1090,6 +1100,9 @@ curl -H "X-API-Key: your-api-key" \
 
 把当前领取中的项目邮箱标记为成功。
 
+外部系统可使用 API Key 版本路径 `/api/external/projects/<project_key>/complete-success`，请求体和响应体与本接口一致。
+也可以调用通用路径 `/api/external/accounts/complete-success`，并在请求体中增加 `project_key`。
+
 #### 请求体
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -1103,6 +1116,9 @@ curl -H "X-API-Key: your-api-key" \
 ### POST `/api/projects/<project_key>/complete-failed`
 
 把当前领取中的项目邮箱标记为失败。
+
+外部系统可使用 API Key 版本路径 `/api/external/projects/<project_key>/complete-failed`，请求体和响应体与本接口一致。
+也可以调用通用路径 `/api/external/accounts/complete-failed`，并在请求体中增加 `project_key`。
 
 - 状态会从 `claiming` 变成 `failed`
 - `failed` 不会自动再次参与分配
@@ -1126,6 +1142,9 @@ curl -H "X-API-Key: your-api-key" \
 
 - 状态会从 `claiming` 回到 `toClaim`
 - 适合任务中断、主动放弃等场景
+
+外部系统可使用 API Key 版本路径 `/api/external/projects/<project_key>/release`，请求体和响应体与本接口一致。
+也可以调用通用路径 `/api/external/accounts/release`，并在请求体中增加 `project_key`。
 
 ### POST `/api/projects/<project_key>/reset-failed`
 

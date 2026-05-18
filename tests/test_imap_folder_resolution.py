@@ -589,6 +589,10 @@ class ExternalAccountsApiTests(unittest.TestCase):
 
         with self.app.app_context():
             db = web_outlook_app.get_db()
+            db.execute('DELETE FROM project_account_events')
+            db.execute('DELETE FROM project_accounts')
+            db.execute('DELETE FROM project_group_scopes')
+            db.execute('DELETE FROM projects')
             db.execute('DELETE FROM account_tags')
             db.execute('DELETE FROM account_aliases')
             db.execute('DELETE FROM account_refresh_logs')
@@ -664,6 +668,228 @@ class ExternalAccountsApiTests(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload['success'])
         self.assertIn('API Key', payload['error'])
+
+    def test_external_project_claim_requires_api_key(self):
+        response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={'caller_id': 'worker-1', 'task_id': 'task-001'}
+        )
+
+        self.assertEqual(response.status_code, 401)
+        payload = response.get_json()
+        self.assertFalse(payload['success'])
+        self.assertIn('API Key', payload['error'])
+
+    def test_external_project_claim_allocates_distinct_accounts_for_same_caller(self):
+        with self.app.app_context():
+            self.assertTrue(web_outlook_app.add_account(
+                'second@outlook.com',
+                'password123',
+                '24d9a0ed-8787-4584-883c-2fd79308940b',
+                '0.AXEA_second_refresh',
+                group_id=1,
+            ))
+            project = web_outlook_app.start_project(
+                'gpt',
+                name='GPT',
+                group_ids=[1],
+                group_ids_provided=True,
+            )
+            self.assertEqual(project['total_count'], 2)
+
+        first_response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={
+                'caller_id': 'worker-1',
+                'task_id': 'task-001',
+                'lease_seconds': 600,
+            },
+            headers={'X-API-Key': 'test-external-key'}
+        )
+        second_response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={
+                'caller_id': 'worker-1',
+                'task_id': 'task-002',
+                'lease_seconds': 600,
+            },
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        first_payload = first_response.get_json()
+        second_payload = second_response.get_json()
+        self.assertTrue(first_payload['success'])
+        self.assertTrue(second_payload['success'])
+        first_account = first_payload['data']
+        second_account = second_payload['data']
+        self.assertNotEqual(first_account['account_id'], second_account['account_id'])
+        self.assertNotEqual(first_account['email'], second_account['email'])
+        self.assertTrue(first_account['claim_token'].startswith('pclm_'))
+        self.assertTrue(second_account['claim_token'].startswith('pclm_'))
+
+    def test_external_project_release_returns_claimed_account_to_pool(self):
+        with self.app.app_context():
+            project = web_outlook_app.start_project(
+                'gpt',
+                name='GPT',
+                group_ids=[1],
+                group_ids_provided=True,
+            )
+            self.assertEqual(project['total_count'], 1)
+
+        claim_response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={'caller_id': 'worker-1', 'task_id': 'task-001', 'lease_seconds': 600},
+            headers={'X-API-Key': 'test-external-key'}
+        )
+        claim_payload = claim_response.get_json()
+        account = claim_payload['data']
+
+        release_response = self.client.post(
+            '/api/external/projects/gpt/release',
+            json={
+                'account_id': account['account_id'],
+                'claim_token': account['claim_token'],
+                'caller_id': 'worker-1',
+                'task_id': 'task-001',
+                'detail': 'client cancelled',
+            },
+            headers={'X-API-Key': 'test-external-key'}
+        )
+        second_claim_response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={'caller_id': 'worker-2', 'task_id': 'task-002', 'lease_seconds': 600},
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(release_response.status_code, 200)
+        self.assertTrue(release_response.get_json()['success'])
+        self.assertEqual(second_claim_response.status_code, 200)
+        second_account = second_claim_response.get_json()['data']
+        self.assertEqual(second_account['account_id'], account['account_id'])
+
+    def test_external_account_claim_alias_uses_project_key_from_body(self):
+        with self.app.app_context():
+            web_outlook_app.start_project('gpt', name='GPT', group_ids=[1], group_ids_provided=True)
+
+        claim_response = self.client.post(
+            '/api/external/accounts/claim',
+            json={
+                'project_key': 'gpt',
+                'caller_id': 'worker-1',
+                'task_id': 'task-001',
+                'lease_seconds': 600,
+            },
+            headers={'X-API-Key': 'test-external-key'}
+        )
+        account = claim_response.get_json()['data']
+        release_response = self.client.post(
+            '/api/external/accounts/release',
+            json={
+                'project_key': 'gpt',
+                'account_id': account['account_id'],
+                'claim_token': account['claim_token'],
+                'caller_id': 'worker-1',
+                'task_id': 'task-001',
+            },
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(claim_response.status_code, 200)
+        self.assertTrue(claim_response.get_json()['success'])
+        self.assertEqual(account['project_key'], 'gpt')
+        self.assertEqual(release_response.status_code, 200)
+        self.assertTrue(release_response.get_json()['success'])
+
+    def test_external_project_complete_success_marks_claim_done(self):
+        with self.app.app_context():
+            web_outlook_app.start_project('gpt', name='GPT', group_ids=[1], group_ids_provided=True)
+
+        claim_response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={'caller_id': 'worker-1', 'task_id': 'task-001'},
+            headers={'X-API-Key': 'test-external-key'}
+        )
+        account = claim_response.get_json()['data']
+
+        complete_response = self.client.post(
+            '/api/external/projects/gpt/complete-success',
+            json={
+                'account_id': account['account_id'],
+                'claim_token': account['claim_token'],
+                'caller_id': 'worker-1',
+                'task_id': 'task-001',
+                'detail': 'registered',
+            },
+            headers={'X-API-Key': 'test-external-key'}
+        )
+        next_claim_response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={'caller_id': 'worker-2', 'task_id': 'task-002'},
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(complete_response.status_code, 200)
+        self.assertTrue(complete_response.get_json()['success'])
+        next_payload = next_claim_response.get_json()
+        self.assertEqual(next_claim_response.status_code, 200)
+        self.assertFalse(next_payload['success'])
+        self.assertIn('没有可领取的项目邮箱', next_payload['error'])
+
+        with self.app.app_context():
+            row = web_outlook_app.get_db().execute(
+                '''
+                SELECT pa.status, pa.last_result, pa.last_result_detail
+                FROM project_accounts pa
+                WHERE pa.account_id = ?
+                LIMIT 1
+                ''',
+                (account['account_id'],)
+            ).fetchone()
+            self.assertEqual(row['status'], 'done')
+            self.assertEqual(row['last_result'], 'success')
+            self.assertEqual(row['last_result_detail'], 'registered')
+
+    def test_external_project_complete_failed_marks_claim_failed(self):
+        with self.app.app_context():
+            web_outlook_app.start_project('gpt', name='GPT', group_ids=[1], group_ids_provided=True)
+
+        claim_response = self.client.post(
+            '/api/external/projects/gpt/claim-random',
+            json={'caller_id': 'worker-1', 'task_id': 'task-001'},
+            headers={'X-API-Key': 'test-external-key'}
+        )
+        account = claim_response.get_json()['data']
+
+        complete_response = self.client.post(
+            '/api/external/projects/gpt/complete-failed',
+            json={
+                'account_id': account['account_id'],
+                'claim_token': account['claim_token'],
+                'caller_id': 'worker-1',
+                'task_id': 'task-001',
+                'detail': 'provider blocked',
+            },
+            headers={'X-API-Key': 'test-external-key'}
+        )
+
+        self.assertEqual(complete_response.status_code, 200)
+        self.assertTrue(complete_response.get_json()['success'])
+        with self.app.app_context():
+            row = web_outlook_app.get_db().execute(
+                '''
+                SELECT pa.status, pa.last_result, pa.last_result_detail
+                FROM project_accounts pa
+                WHERE pa.account_id = ?
+                LIMIT 1
+                ''',
+                (account['account_id'],)
+            ).fetchone()
+            self.assertEqual(row['status'], 'failed')
+            self.assertEqual(row['last_result'], 'failed')
+            self.assertEqual(row['last_result_detail'], 'provider blocked')
 
     def test_internal_emails_requires_login(self):
         response = self.client.get('/api/emails/user@outlook.com?folder=inbox')
